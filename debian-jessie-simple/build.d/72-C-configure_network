@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# NOTE: Any number of changes can be done to the root filesystem before it is
+# compiled to a squashfs image: Package installation, file changes, deleting
+# bulky and unnecessary files, etc. This example only shows the very bare
+# minimum needed to make the system useful.
+
+# The hostname file contains the build host's hostname, so it needs to be unset
+# or changed. We set it to 'rib' here, but it can be assigned in a variety of
+# ways, including via DHCP.
+printf "rib\n" > /etc/hostname
+
+# The network interface configuration is empty by default. Enable a single
+# 'eth0' interface, configured by DHCP.
+cat > /etc/network/interfaces.d/eth0 << EOF
+allow-hotplug eth0
+iface eth0 inet dhcp
+EOF

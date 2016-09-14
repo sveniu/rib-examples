@@ -8,6 +8,11 @@ fakeroot, [fakechroot][1] and chroot. `rib` always runs as a normal user.
 These are example build profiles for some common use cases. Each profile comes
 with an informative README file describing its features and dependencies.
 
+* `debian-jessie-simple`: A standard Debian Jessie image. The simplicity refers
+to how the build profile is kept as simple and informational as possible. It is
+a good idea to read through all the build scripts to understand what's
+happening.
+
 [1]: https://github.com/sveniu/rib/
 
 

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Before we create a squashfs image of the root filesystem, it is necessary to
+# fix all symlinks that were created by fakechroot when installing the system.
+# See the fakechroot(1) man page 'LIMITATIONS' section for details about this.
+# In short, the symlinks point to the full path from the perspective of the
+# host filesystem, not that of the build root filesystem.
+#
+# The loop finds all symlinks that point to the full path of the host
+# filesystem, and makes them relative to the built root filesystem.
+#
+# See also:
+#   https://github.com/dex4er/fakechroot/issues/1
+#   https://github.com/dex4er/fakechroot/blob/master/scripts/relocatesymlinks.sh
+#
+find "$RIB_DIR_ROOTFS" -lname "${RIB_DIR_ROOTFS}*" | while read path
+do
+	ltarget=`readlink "$path"`
+	ln -sf -T "${ltarget#$RIB_DIR_ROOTFS}" "$path"
+done
+
+# Replace dev and proc symlinks with empty directories. These were put in place
+# by fakechroot during the debootstrap step.
+for dir in dev proc; do
+	if [ -h "$RIB_DIR_ROOTFS"/"$dir" ]; then
+		rm "$RIB_DIR_ROOTFS"/"$dir"
+		mkdir "$RIB_DIR_ROOTFS"/"$dir"
+	fi
+done
+
+# Create squashfs image. The kernel version is indicated in the image name,
+# since it contains kernel modules that must match the kernel executable. This
+# makes it easy to match together the kernel, initrd/squashfs later.
+mksquashfs \
+	"$RIB_DIR_ROOTFS" \
+	"$RIB_DIR_TEMP"/rootfs-"$RIB_KERNEL_VERSION".squashfs \
+	-comp xz -b 1048576 \
+	-noappend -no-progress

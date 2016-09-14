@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Download and extract the Linux kernel image package, which contains the
+# kernel itself and a large number of kernel modules. This script is executed
+# with the 'C' chroot flag, so all commands will work as if they were running
+# in a real root filesystem.
+
+# Determine the architecture, which is needed to construct the name of the
+# kernel package below.
+arch=`dpkg --print-architecture`
+
+# Determine the name of the package. On Debian, the 'linux-image-ARCH' meta
+# package depends on the real package containing the kernel and modules.
+kernel_package=`apt-cache depends linux-image-amd64 |
+	awk '/Depends:.linux-image-/{print $2}'`
+
+# Download the kernel package into the VTEMP volatile temporary directory,
+# which is automatically removed after this script finishes.
+cd "$VTEMP"
+apt-get download "$kernel_package"
+
+# Extract the kernel package directly onto the filesystem without doing
+# a normal install. This is necessary to avoid installing dependencies like
+# 'initramfs-tools', which will try to make its own initrd image.
+dpkg-deb --extract "$kernel_package"_*.deb /
+
+# Determine the kernel version. This is the version string internal to the
+# kernel and all modules. It is easiest to obtain from the /lib/modules/
+# directory.
+kernel_version=`ls -1rt /lib/modules | tail -n1`
+
+# Generate module dependency lists. This duplicates the behaviour of the
+# package's own post-installation script. Dependency lists are not part of the
+# package, so they are created after installing the modules.
+depmod "$kernel_version"
+
+# Export the kernel version in RIB_KERNEL_VERSION, so that the following
+# scripts know which version to number to deal with.
+printf >&3 "%s\037%s\037%s\0" setenv "RIB_KERNEL_VERSION" "$kernel_version"

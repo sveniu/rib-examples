@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Move the kernel executable named 'vmlinuz-<version>' from the root filesystem
+# to the distribution directory. The RIB_KERNEL_VERSION variable was set in the
+# previous script running inside the chroot.
+#
+# The kernel executable is the first of two essential files required to boot
+# a system; the second is the initrd that will be created later.
+mv "$RIB_DIR_ROOTFS"/boot/vmlinuz-"$RIB_KERNEL_VERSION" "$RIB_DIR_DIST"

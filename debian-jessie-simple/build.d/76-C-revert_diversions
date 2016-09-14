@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Remove the wrappers installed by debootstrap's 'fakechroot' variant. These
+# were installed and marked as "diversions", so we can use the 'dpkg-divert'
+# command to identify and remove them.
+dpkg-divert --list | while read x x current x real x pkg
+do
+	if [ "$pkg" = "fakechroot" ]
+	then
+		dpkg-divert --remove "$current"
+		mv -v "$real" "$current"
+	fi
+done

@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# Enable option 'errexit', which will make the shell exit with an error on any
+# untested command failure, which is useful for catching errors early. This
+# works on pretty much any shell: sh, dash, ash, bash, ksh, csh, tcsh, zsh,
+# etc. A non-zero exit code will make the rib build process stop.
+set -e
+
+# Enable option 'nounset', which will exit with an error if the shell tries to
+# expand an unset variable. This can help avoid problems where unexpanded
+# variables produce valid but dangerous results, like rm -rf "$MYDIR"/*
+set -u
+
+# Run debootstrap.
+#
+# The variant defaults to 'fakechroot', which -- like the default variant --
+# installs all packages with priority 'required' and 'important'. It does a few
+# things in addition:
+#
+# o Install the 'binutils' package. This can be removed at a later stage.
+#
+# o Symlink /proc into the new filesystem. This link is removed later and
+#   a directory is created in its place, before the root image is built.
+#
+# o Install wrappers for /sbin/ldconfig and /usr/bin/ldd. These are removed
+#   before building the root image; see the 'revert_diversions' script.
+#
+# The architecture defaults to that of the host system.
+#
+# The target dir points to RIB_DIR_ROOTFS, which expands to <rib_dir>/rootfs
+debootstrap \
+	--variant=fakechroot \
+	jessie \
+	"$RIB_DIR_ROOTFS" \
+	http://httpredir.debian.org/debian
+
+# After debootstrap completes, the root filesystem can be inspected either from
+# the outside, or by running 'rib shell' for an interactive shell session in
+# a chroot.

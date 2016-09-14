@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Move the 'busybox' binary from the root filesystem to the "persistent" temp
+# directory. The RIB_BUSYBOX_PATH variable indicates the path to the binary,
+# relative to the root.
+mv "$RIB_DIR_ROOTFS"/"$RIB_BUSYBOX_PATH" "$RIB_DIR_TEMP"/

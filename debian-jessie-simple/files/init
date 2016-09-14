@@ -1,0 +1,77 @@
+#!/bin/busybox sh
+
+# This is a minimal, intermediary init script that mounts a squashfs read-only
+# root image and puts a tmpfs read-write mount on top of it, before calling
+# /sbin/init in the new root filesystem. It is primarily meant as a proof of
+# concept for the 'rib' Root Image Build tool.
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Prepare directories and install busybox. The --install option requires
+# invoking the binary with a full path, as it's used as the link target.
+busybox mkdir -p /sbin /usr /usr/bin /usr/sbin
+/bin/busybox --install
+
+# Mount /proc, /sys and /dev.
+mkdir -p /proc /sys /dev
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+# Load loop and squashfs kernel modules.
+modprobe loop # squashfs mount dependency
+modprobe squashfs
+
+# Determine squashfs filename. Default is 'rootfs.squashfs', but try to match
+# it against the running kernel version.
+squashfs_path="/rootfs.squashfs"
+kernel_version=`uname -r`
+if [ -f "/rootfs-$kernel_version.squashfs" ]; then
+	squashfs_path="/rootfs-$kernel_version.squashfs"
+fi
+
+# Mount read-only squashfs root in /newroot_ro.
+mkdir /newroot_ro
+mount -t squashfs "$squashfs_path" /newroot_ro
+
+# Symlink /lib to /newroot_ro/lib, which makes modprobe work correctly; it
+# looks for modules.dep in /lib/modules/<kernel_version>/.
+mv /lib /lib.old
+ln -s /newroot_ro/lib /lib
+
+# Mount read-write tmpfs ramdisk in /newroot_rw.
+mkdir /newroot_rw
+mount -t tmpfs -o size=100%,mode=0755 tmpfs /newroot_rw
+
+# Mount an aufs union of the read-only and read-write mounts, in /newroot. The
+# aufs kernel module was removed from Debian's kernel configuration in 3.18;
+# overlayfs was introduced in the same release. Debian Jessie uses kernel 3.16
+# by default, and thus aufs is available there. If a 3.18+ kernel is used, the
+# aufs mount should be changed to use overlayfs.
+mkdir /newroot
+mount -t aufs -o br:/newroot_rw,br:/newroot_ro aufs /newroot
+
+# Mount rudimentary devtmpfs, required for switch_root or run-init to open
+# /dev/console.
+test -d /newroot/dev || mkdir /newroot/dev
+mount -t devtmpfs devtmpfs /newroot/dev
+
+# Move read-only and read-write mount points inside the new root.
+mkdir -p /newroot/oldroot/ro /newroot/oldroot/rw
+mount -o move /newroot_ro /newroot/oldroot/ro
+mount -o move /newroot_rw /newroot/oldroot/rw
+
+# Mount /proc in the new root.
+test -d /newroot/proc || mkdir /newroot/proc
+mount -t proc proc /newroot/proc
+
+# Umount dev, sys and proc.
+umount /dev
+umount /sys
+umount /proc
+
+# Switch root and continue init. The 'switch_root' path has changed with
+# busybox versions, so we use let the shell determine the path.
+exec `command -v switch_root` /newroot /sbin/init

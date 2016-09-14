@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Start preparation for creating the initrd image by fetching and extracting
+# the 'busybox-static' package. The statically compiled 'busybox' binary
+# contains all the tools needed during the init stage, with a pretty small size
+# footprint.
+#
+# Fetching busybox from within the chroot has a few advantages: The package is
+# implicitly verified; and while the package is readily available on Debian and
+# Ubuntu systems, it is not available on RHEL/CentOS 6, for example.
+
+# Download and extract the 'busybox-static' package into the VTEMP volatile
+# temporary directory, which is automatically removed after this script
+# finishes.
+cd "$VTEMP"
+apt-get download busybox-static
+dpkg-deb -x busybox-static*.deb ./
+
+# Move the static binary into /tmp/, so that the following script can copy it
+# from there; the VTEMP directory is auto-removed.
+mv bin/busybox /tmp/
+
+# Export the binary path in RIB_BUSYBOX_PATH, used by the following
+# script to move the binary out of the chroot, making it available to
+# the initrd.
+printf >&3 "%s\037%s\037%s\0" setenv "RIB_BUSYBOX_PATH" "/tmp/busybox"
