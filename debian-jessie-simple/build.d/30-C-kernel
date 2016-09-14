@@ -15,7 +15,7 @@ arch=`dpkg --print-architecture`
 
 # Determine the name of the package. On Debian, the 'linux-image-ARCH' meta
 # package depends on the real package containing the kernel and modules.
-kernel_package=`apt-cache depends linux-image-amd64 |
+kernel_package=`apt-cache depends linux-image-"$arch" |
 	awk '/Depends:.linux-image-/{print $2}'`
 
 # Download the kernel package into the VTEMP volatile temporary directory,
