@@ -26,6 +26,10 @@ apt-get download "$kernel_package"
 # Extract the kernel package directly onto the filesystem without doing
 # a normal install. This is necessary to avoid installing dependencies like
 # 'initramfs-tools', which will try to make its own initrd image.
+#
+# This extraction is certainly a bit crude, but the kernel package content is
+# very clean: it only puts files in /lib/modules/<version>, and a vmlinuz,
+# config and System.map in /boot.
 dpkg-deb --extract "$kernel_package"_*.deb /
 
 # Determine the kernel version. This is the version string internal to the
