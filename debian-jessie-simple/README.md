@@ -27,6 +27,9 @@ completes. This free space is used by normal programs, but also by changing
 or adding new files in the filesystem due to the tmpfs aufs overlay on top of
 the read-only squashfs image.
 
+Dependencies: `fakechroot`, `fakeroot`, `debootstrap`, `mksquashfs` (in package
+`squashfs-tools` in Debian/Ubuntu).
+
 Build with `rib build -v`; test with qemu:
 ```sh
 qemu-system-x86_64 -nographic -m 512M -append "console=ttyS0" \
