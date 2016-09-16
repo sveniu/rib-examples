@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# This script does both rudimentary and aggressive removal of packages and
+# files, to make the root image as small as possible, while keeping it fully
+# usable. To find more candidates for removal, use tools like 'du' or 'ncdu' to
+# navigate the filesystem by size.
+
+# Remove redundant packages.
+apt-get --assume-yes --purge autoremove
+
+# Clean the package cache.
+apt-get clean
+
+# Remove package indexes. This is a bit crude, but is an easy way to remove
+# only the indexes, leaving other files like 'lock' and 'partial' untouched.
+# Due to Debian's repository structure, there will always be at least three
+# directory separators (represented here by underscores) for these index files.
+rm -f /var/lib/apt/lists/*_*_*_*
+
+# Now we move on to more aggressive cleanup, where lots of stuff is removed
+# without consideration for the package system. This is arguably fine to do,
+# since the running system is not supposed to be kept running and evolve much
+# over time. There is bound to be application-specific needs here, so this must
+# be tuned to suit the system role.
+
+# Remove all locales.
+rm -rf /usr/share/locale/*
+rm -rf /usr/share/i18n/locales/*
+
+# Remove all documentation.
+rm -rf /usr/share/doc/*
+
+# Remove some old files that take up significant space.
+rm -f /var/cache/debconf/templates.dat-old
+rm -f /var/lib/dpkg/*-old
+
+# Remove large kernel modules that we will never need.
+rm -rf /lib/modules/*/kernel/drivers/gpu
+rm -rf /lib/modules/*/kernel/drivers/infiniband
+rm -rf /lib/modules/*/kernel/drivers/isdn
+rm -rf /lib/modules/*/kernel/drivers/media
+rm -rf /lib/modules/*/kernel/drivers/net/can
+rm -rf /lib/modules/*/kernel/drivers/net/irda
+rm -rf /lib/modules/*/kernel/drivers/net/usb
+rm -rf /lib/modules/*/kernel/drivers/net/wireless
+rm -rf /lib/modules/*/kernel/drivers/staging
+rm -rf /lib/modules/*/kernel/drivers/video

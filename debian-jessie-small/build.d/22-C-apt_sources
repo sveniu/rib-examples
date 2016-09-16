@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Configure APT sources. The mirror specified during debootstrap is added by
+# default. Add the security repository.
+cat > /etc/apt/sources.list.d/security.list << EOF
+deb http://security.debian.org/ ${RIB_DEB_SUITE:-jessie}/updates main contrib non-free
+EOF
+
+# Add the backports repository, to get access to certain newer packages.
+cat > /etc/apt/sources.list.d/backports.list << EOF
+deb ${RIB_DEB_MIRROR:-http://httpredir.debian.org/debian} ${RIB_DEB_SUITE:-jessie}-backports main contrib non-free
+EOF
+
+# Pin certain packages to the backports release. This will make apt-get
+# operations automatically choose the desired version, without having to
+# specify a target release.
+cat > /etc/apt/preferences.d/backports << EOF
+Explanation: Prioritize the backports Linux kernel.
+Package: linux-image-*
+Pin: release a=${RIB_DEB_SUITE:-jessie}-backports
+Pin-Priority: 999
+
+Explanation: Dependency of the kernel image packages.
+Package: linux-base
+Pin: release a=${RIB_DEB_SUITE:-jessie}-backports
+Pin-Priority: 999
+
+Explanation: Firmware packages are not dependencies of the linux-image
+Explanation: packages and are rather installed based on what hardware is
+Explanation: found in the system. Backports provides several firmware
+Explanation: packages and we simply pin all of them.
+Package: firmware-*
+Pin: release a=${RIB_DEB_SUITE:-jessie}-backports
+Pin-Priority: 999
+EOF
+
+# Add i386 as a foreign architecture if the primary architecture is amd64. This
+# is generally not necessary, but there are unfortunately still a lot of
+# closed-source vendor tools that are only available as 32-bit builds. Examples
+# include BIOS setting tools and hardware RAID tools.
+arch=`dpkg --print-architecture`
+if [ "$arch" = "amd64" ]; then
+	dpkg --add-architecture i386
+fi
+
+# Update the APT cache after adding repositories and foreign architectures.
+apt-get --quiet --assume-yes update

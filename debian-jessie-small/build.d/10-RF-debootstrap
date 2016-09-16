@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Run debootstrap.
+debootstrap \
+	--variant="${RIB_DEB_VARIANT:-fakechroot}" \
+	${RIB_DEB_DEBOOTSTRAP_OPTS:-} \
+	"${RIB_DEB_SUITE:-jessie}" \
+	"$RIB_DIR_ROOTFS" \
+	"${RIB_DEB_MIRROR:-http://httpredir.debian.org/debian}"

@@ -13,6 +13,9 @@ to how the build profile is kept as simple and informational as possible. It is
 a good idea to read through all the build scripts to understand what's
 happening.
 
+* `debian-jessie-small`: A small ~62 MiB Debian Jessie image. Most of the build
+scripts are symlinks to the simple example above.
+
 [1]: https://github.com/sveniu/rib/
 
 

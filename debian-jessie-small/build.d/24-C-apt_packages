@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Set DEBIAN_FRONTEND and TERM, to avoid debconf warnings.
+DEBIAN_FRONTEND="noninteractive"
+export DEBIAN_FRONTEND
+TERM="linux"
+export TERM
+
+# Upgrade packages.
+apt-get \
+	--quiet \
+	--assume-yes \
+	-o DPkg::options::="--force-confnew" \
+	dist-upgrade
+
+# Remove some relatively large packages.
+#
+# o wget has priority 'important' and is thus installed by default. It pulls in
+#   the 20+ MB icu library, so we remove wget first, and the libicu will be
+#   removed by the 'autoremove' operation later.
+#
+# o binutils was installed by the 'fakechroot' debootstrap variant. It
+#   is not needed at this point.
+apt-get --quiet --assume-yes --purge remove \
+	wget \
+	binutils \
+
+# Install some generally useful packages.
+apt-get \
+	--quiet \
+	--assume-yes \
+	-o DPkg::options::="--force-confnew" \
+	install \
+		ethtool \
+		strace \
+		tcpdump \

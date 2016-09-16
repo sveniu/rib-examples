@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Determine architecture.
+arch=`dpkg --print-architecture`
+
+# Determine package name. The '/candidate' version indicator will ensure that
+# we select the desired package version set by package pin priorities. Since we
+# pin the kernel image to backports, this will ensure that we download the
+# appropriate deb. Check Debian- and Ubuntu-style package names.
+#
+# Since we pipe to awk inside the subshell, the return code will be 0 even if
+# the apt-cache command fails. Since sh/dash doesn't have the 'pipefail'
+# option, we rely on checking the contents of the variable instead of the
+# return code.
+for kpkg in linux-image-"$arch" linux-image-generic
+do
+	kernel_package=`apt-cache depends "$kpkg"/candidate |
+		awk '/Depends:.linux-image-/{print $2}'`
+	test -n "$kpkg" && break
+done
+
+# Verify variable. This will fail if it is unset, ref 'set -u'.
+true "$kernel_package"
+
+# Download and extract.
+cd "$VTEMP"
+apt-get download "$kernel_package"
+dpkg-deb --extract "$kernel_package"_*.deb /
+
+# Generate module dependency list and export the version string.
+kernel_version=`ls -1rt /lib/modules | tail -n1`
+depmod "$kernel_version"
+printf >&3 "%s\037%s\037%s\0" setenv "RIB_KERNEL_VERSION" "$kernel_version"
