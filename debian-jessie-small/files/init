@@ -39,18 +39,18 @@ get_kparam () {
 busybox mkdir -p /sbin /usr /usr/bin /usr/sbin
 /bin/busybox --install
 
-start_shell=`get_kparam rib.shell` || true
-
-if [ "${debug_level:-0}" -gt 0 ] 2>/dev/null; then
-	printf "Starting shell session; exit to resume init.\n"
-	/bin/sh
-fi
-
 # Mount /proc, /sys and /dev.
 mkdir -p /proc /sys /dev
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
+
+# Start debug shell if rib.debug > 0.
+debug_level=`get_kparam rib.debug` || true
+if [ "${debug_level:-0}" -gt 0 ] 2>/dev/null; then
+	printf "Starting shell session; exit to resume init.\n"
+	/bin/sh
+fi
 
 # Load loop and squashfs kernel modules.
 modprobe loop # squashfs mount dependency
