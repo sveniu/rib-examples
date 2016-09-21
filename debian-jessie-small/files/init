@@ -11,7 +11,8 @@ set -u
 
 # Get the specified kernel command line parameter.
 get_kparam () {
-	test -n "$1" || return 1
+	_qparam="${1:-}"
+	test -n "$_qparam" || return 1
 	test -n "${_kcmdline:-}" 2>/dev/null || {
 		test -f /proc/cmdline || return 1
 		read _kcmdline < /proc/cmdline
@@ -20,7 +21,7 @@ get_kparam () {
 	set -- ${_kcmdline:-}
 	for kparam
 	do
-		test "$1" = "${kparam%%=*}" && {
+		test "$_qparam" = "${kparam%%=*}" && {
 			_val="${kparam#*=}"
 			test -z "$_val" && _val=1
 			continue # Last match wins.
