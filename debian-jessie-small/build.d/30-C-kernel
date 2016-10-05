@@ -16,15 +16,38 @@ arch=`dpkg --print-architecture`
 # the apt-cache command fails. Since sh/dash doesn't have the 'pipefail'
 # option, we rely on checking the contents of the variable instead of the
 # return code.
+#
+# The awk program will parse the dependencies, and handles not only the
+# straight-forward, single-dependency, explicit dependency case; but also the
+# case where there's a dependency on a virtual package (identified by angle
+# brackets), and one or more real packages that provide the virtual package.
 for kpkg in linux-image-"$arch" linux-image-generic
 do
 	kernel_package=`apt-cache depends "$kpkg"/candidate |
-		awk '/Depends:.linux-image-/{print $2}'`
-	test -n "$kpkg" && break
+		awk '
+			/Depends:/ {
+				pkg=$2;
+				if (index(pkg, "<") == 1)
+					virtual=1
+				else {
+					print pkg;
+					exit;
+				}
+			}
+			/^    / {
+				if (virtual) {
+					print $1;
+					exit;
+				}
+			}'`
+	test -n "$kernel_package" && break
 done
 
-# Verify variable. This will fail if it is unset, ref 'set -u'.
-true "$kernel_package"
+# Return failure if no candidate package was found.
+test -n "$kernel_package" || {
+	printf >&2 "Unable to find package for kernel image.\n"
+	exit 1
+}
 
 # Download and extract.
 cd "$VTEMP"
