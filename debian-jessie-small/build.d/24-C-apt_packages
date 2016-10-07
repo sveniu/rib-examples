@@ -4,6 +4,18 @@
 set -e
 set -u
 
+# Disable service invocations, primarily to avoid problems with package
+# installs that invoke service actions, and are prone to failing when run from
+# within a chroot environment, especially when fakechroot is involved.
+#
+# This file is removed in a later step, ref 77-C-remove_policy-rc.d. See also
+# /usr/share/doc/sysv-rc/README.policy-rc.d.gz for more information.
+cat > /usr/sbin/policy-rc.d << EOF
+#!/bin/sh
+exit 101
+EOF
+chmod +x /usr/sbin/policy-rc.d
+
 # Set DEBIAN_FRONTEND and TERM, to avoid debconf warnings.
 DEBIAN_FRONTEND="noninteractive"
 export DEBIAN_FRONTEND
