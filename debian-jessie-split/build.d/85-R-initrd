@@ -4,34 +4,72 @@
 set -e
 set -u
 
-# The initrd image contains busybox (shell and utilities), a simple init
-# script, two kernel modules (loop and squashfs), and the root squashfs image.
-# The init script will mount the squashfs image with a tmpfs overlay, and then
-# switch execution to the real init inside the squashfs image.
+# The initrd image contains busybox (shell and utilities), an init script, some
+# kernel modules (loop, squashfs and network interface drivers), and tools for
+# fetching the root squashfs image. The init script will mount the squashfs
+# image with a tmpfs overlay, and then switch execution to the real init inside
+# the squashfs image.
 
-# First, copy the loop and squashfs kernel modules. These modules are needed to
-# mount the root filesystem. After that, additional modules can be loaded from
+# Copy kernel modules that are necessary to mount the root filesystem. These
+# include loop and squashfs for the image itself, plus any additional modules
+# needed to obtain the image. After that, additional modules can be loaded from
 # within the newly mounted root.
 #
-# Loop over the modules and look up their full paths. Copy the modules to the
-# target directory while preserving the directory structure with cpio.
+# Loop over the modules and look up their full paths in the modules.dep file.
+# Handle module and firmware dependencies. Copy the files to the target
+# directory while preserving the directory structure with cpio. The modules.dep
+# file was created by running depmod in 30-C-kernel.
+modules_dep_path="${RIB_DIR_ROOTFS}/lib/modules/${RIB_KERNEL_VERSION}/modules.dep"
+for kmod in \
+	bnx2 \
+	bnx2x \
+	e1000 \
+	e1000e \
+	igb \
+	ixgbe \
+	loop \
+	squashfs \
+	tg3 \
+	virtio_net \
+	${RIB_KMOD_INCLUDE:-} \
+; do
+	# Firmware dependencies.
+	modinfo -F firmware "$kmod" | while read fw_path
+	do
+		# Check whether firmware exists.
+		if [ ! -f "$RIB_DIR_ROOTFS"/lib/firmware/"$fw_path" ]; then
+			# Warn and continue.
+			printf >&2 "WARNING: Module '%s' firmware dependency '%s' not found in '%s'.\n" \
+				"$kmod" \
+				"$fw_path" \
+				"$RIB_DIR_ROOTFS"/lib/firmware/
+			continue
+		fi
 
-#for kmod in loop squashfs
-#do
-#	modinfo -b "$RIB_DIR_ROOTFS" -k "$RIB_KERNEL_VERSION" --filename "$kmod"
-#done | while read kmodpath
-#do
-#	# Strip directory prefix.
-#	printf "%s\n" "${kmodpath#$RIB_DIR_ROOTFS}"
-#done | cpio -pmd "$VTEMP"
+		# Print un-anchored path relative to the rib root.
+		printf "lib/firmware/%s\n" \
+			"$fw_path"
+	done
 
-mkdir -p "$VTEMP"/lib/modules/"$RIB_KERNEL_VERSION"
-for kmod in loop squashfs
-do
-	path=`modinfo -b "$RIB_DIR_ROOTFS" \
-		-k "$RIB_KERNEL_VERSION" --filename "$kmod"`
-	cp "$path" "$VTEMP"/lib/modules/"$RIB_KERNEL_VERSION"
-done
+	# Module dependencies.
+	grep -F "/${kmod}.ko:" "$modules_dep_path" | while read kmod_path deps
+	do
+		# Print un-anchored path relative to the rib root.
+		printf "lib/modules/%s/%s\n" \
+			"$RIB_KERNEL_VERSION" \
+			"${kmod_path%:}"
+		for dep_path in $deps
+		do
+			# Print un-anchored path relative to the rib root.
+			printf "lib/modules/%s/%s\n" \
+				"$RIB_KERNEL_VERSION" \
+				"$dep_path"
+		done
+	done
+done | sort -u | (
+	cd "$RIB_DIR_ROOTFS"
+	cpio -pmd "$VTEMP"
+)
 
 # Create the module dependency lists. This produces a harmless warning about
 # missing files.
