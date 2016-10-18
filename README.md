@@ -16,6 +16,10 @@ happening.
 * `debian-jessie-small`: A small ~62 MiB Debian Jessie image. Most of the build
 scripts are symlinks to the simple example above.
 
+* `debian-jessie-split`: Like the small profile, but the squashfs image is kept
+separate from the initrd. The init script supports networking and fetching of
+the squashfs image.
+
 [1]: https://github.com/sveniu/rib/
 [2]: https://github.com/dex4er/fakechroot/
 
