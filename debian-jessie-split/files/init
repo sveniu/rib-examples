@@ -1,1 +1,135 @@
-../../debian-jessie-small/files/init
+#!/bin/busybox sh
+
+# This is a minimal, intermediary init script that mounts a squashfs read-only
+# root image and puts a tmpfs read-write mount on top of it, before calling
+# /sbin/init in the new root filesystem. It is primarily meant as a proof of
+# concept for the 'rib' Root Image Build tool.
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Get the specified kernel command line parameter.
+get_kparam () {
+	_qparam="${1:-}"
+	test -n "$_qparam" || return 1
+	test -n "${_kcmdline:-}" 2>/dev/null || {
+		test -f /proc/cmdline || return 1
+		read _kcmdline < /proc/cmdline
+	}
+	unset _val
+	set -- ${_kcmdline:-}
+	for kparam
+	do
+		test "$_qparam" = "${kparam%%=*}" && {
+			_val="${kparam#*=}"
+			test -z "$_val" && _val=1
+			continue # Last match wins.
+		}
+	done
+	test -n "${_val:-}" && {
+		printf "%s\n" "$_val"
+		return
+	}
+	return 1
+}
+
+# Prepare directories and install busybox. The --install option requires
+# invoking the binary with a full path, as it's used as the link target.
+busybox mkdir -p /sbin /usr /usr/bin /usr/sbin
+/bin/busybox --install
+
+# Mount /proc, /sys and /dev.
+mkdir -p /proc /sys /dev
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+# Start debug shell if rib.debug > 0.
+debug_level=`get_kparam rib.debug` || true
+if [ "${debug_level:-0}" -gt 0 ] 2>/dev/null; then
+	printf "Starting shell session; exit to resume init.\n"
+	/bin/sh
+fi
+
+# Load loop and squashfs kernel modules.
+modprobe loop # squashfs mount dependency
+modprobe squashfs
+
+# Determine squashfs filename. Default is 'rootfs.squashfs', but try to match
+# it against the running kernel version.
+squashfs_path="/rootfs.squashfs"
+kernel_version=`uname -r`
+if [ -f "/rootfs-$kernel_version.squashfs" ]; then
+	squashfs_path="/rootfs-$kernel_version.squashfs"
+fi
+
+# Mount read-only squashfs root in /newroot_ro.
+mkdir /newroot_ro
+mount -t squashfs "$squashfs_path" /newroot_ro
+
+# Symlink /lib to /newroot_ro/lib, which makes modprobe work correctly; it
+# looks for modules.dep in /lib/modules/<kernel_version>/.
+mv /lib /lib.old
+ln -s /newroot_ro/lib /lib
+
+# Mount read-write tmpfs ramdisk in /newroot_rw.
+mkdir /newroot_rw
+mount -t tmpfs -o size=100%,mode=0755 tmpfs /newroot_rw
+
+# Determine overlay type. Read the rib.overlay= parameter if available, and
+# fall back to checking the kernel version to determine aufs or overlayfs
+# support. This will work on Debian and Ubuntu, where aufs was available until
+# it was removed in kernel 3.18, when overlayfs took over. It may not work on
+# other distributions; a kernel parameter may be a better idea.
+overlay_type=`get_kparam rib.overlay` || true
+if [ -z "$overlay_type" ]; then
+	overlay_type="overlayfs"
+	kernel_version_major=`uname -r | cut -d. -f1`
+	kernel_version_minor=`uname -r | cut -d. -f2`
+	if [ "$kernel_version_major" -le 3 ]; then
+		overlay_type="aufs"
+		if [ "$kernel_version_minor" -ge 18 ]; then
+			overlay_type="overlayfs"
+		fi
+	fi
+fi
+
+mkdir /newroot
+case "$overlay_type" in
+	aufs)
+		mount -t aufs -o br:/newroot_rw,br:/newroot_ro aufs /newroot
+		;;
+	overlayfs)
+		mkdir /newroot_rw/root
+		mkdir /newroot_rw/work
+		mount -t overlay overlay -olowerdir=/newroot_ro,upperdir=/newroot_rw/root,workdir=/newroot_rw/work /newroot
+		;;
+	*)
+		printf >&2 "Unknown overlay type: %s\n" "$overlay_type"
+		false
+		;;
+esac
+
+# Mount rudimentary devtmpfs, required for switch_root or run-init to open
+# /dev/console.
+test -d /newroot/dev || mkdir /newroot/dev
+mount -t devtmpfs devtmpfs /newroot/dev
+
+# Move read-only and read-write mount points inside the new root.
+mkdir -p /newroot/oldroot/ro /newroot/oldroot/rw
+mount -o move /newroot_ro /newroot/oldroot/ro
+mount -o move /newroot_rw /newroot/oldroot/rw
+
+# Mount /proc in the new root.
+test -d /newroot/proc || mkdir /newroot/proc
+mount -t proc proc /newroot/proc
+
+# Umount dev, sys and proc.
+umount /dev
+umount /sys
+umount /proc
+
+# Switch root and continue init. The 'switch_root' path has changed with
+# busybox versions, so we use let the shell determine the path.
+exec `command -v switch_root` /newroot /sbin/init
