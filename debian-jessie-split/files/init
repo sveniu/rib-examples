@@ -84,6 +84,13 @@ do
 		&& break
 done
 
+# Fetch squashfs image.
+squashfs_url=`get_kparam rib.squashfs_url` || true
+if [ -n "$squashfs_url" ]; then
+	printf "Fetching squashfs image from URL: %s\n" "$squashfs_url"
+	curl -o /rootfs.squashfs "$squashfs_url"
+fi
+
 # Load loop and squashfs kernel modules.
 modprobe loop # squashfs mount dependency
 modprobe squashfs
