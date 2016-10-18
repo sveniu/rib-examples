@@ -1,0 +1,114 @@
+#!/bin/sh
+
+# Resolve library dependencies for an executable, and copy the
+# required files to the target directory. Also supports scripts with
+# a shebang header.
+
+usage () {
+	echo "Usage: $0 file output_directory"
+}
+
+cleanup () {
+	err="${1:-0}"
+	test -n "$tmpdir" && test -d "$tmpdir" && rm -rf "$tmpdir"
+	exit "$err"
+}
+
+reslibs () {
+	test -n "$1" || return 1
+	test -f "$1" || return 1
+
+	# Run ldd and store the output.
+	ldd "$1" > "$tmpdir"/ldd.out 2>/dev/null || return 1
+
+	while read lib _arr path entrypoint
+	do
+		# Entries with => arrow, like regular libs and vdso.
+		test "$_arr" = "=>" && {
+			# Library was not found.
+			test "$path $entrypoint" = "not found" && {
+				#echo >&2 "Library not found: $lib"
+				continue
+			}
+
+			# Path not valid, like for vdso.
+			test -f "$path" || {
+				#echo >&2 "Invalid library path: $path"
+				continue
+			}
+
+			# Path is valid, presumably a normal library.
+			echo "$path"
+			#reslibs "$path"
+		}
+
+		# Handle irregular libs, like for ld-linux.
+		test "$_arr" = "=>" || {
+			case "$lib" in
+				/*)
+					# Absolute path.
+					test -f "$lib" && {
+						#echo "LIBRARY: $lib"
+						echo "$lib"
+						#reslibs "$path"
+					}
+					;;
+				*)
+					#echo >&2 "Unknown library: $lib"
+					continue
+					;;
+			esac
+		}
+	done < "$tmpdir"/ldd.out
+}
+
+shebang () {
+	test -n "$1" || return 1
+	test -f "$1" || return 1
+
+	head -n 1 "$1" > "$tmpdir"/shebang
+	grep -q "^#!" "$tmpdir"/shebang || return 1
+
+	# Use the "while read cmd" construct to strip whitespace.
+	cut -d\! -f2- < "$tmpdir"/shebang | while read cmd args
+	do
+		echo "$cmd" >> "$tmpdir"/file_paths
+		reslibs "$cmd"
+	done && return
+	return 1
+}
+
+test "$#" -eq "2" || {
+	usage
+	exit 0
+}
+
+test -f "$1" || {
+	echo >&2 "FATAL: File not found: $1"
+	exit 1
+}
+
+test -d "$2" || {
+	echo >&2 "FATAL: Target directory not found: $2"
+	exit 1
+}
+
+tmpdir=`mktemp -d` || {
+	echo >&2 "FATAL: mktemp failed: $?"
+	exit 1
+}
+
+# Resolve library dependencies. In case of errors, look for a shebang
+# line and resolve libraries for the binary it points to.
+reslibs "$1" > "$tmpdir"/file_paths ||
+	shebang "$1" > "$tmpdir"/file_paths ||
+		cleanup 1
+
+# Add the executable itself to the list of files to be copied.
+echo "$1" >> "$tmpdir"/file_paths
+
+# Copy executables and their library dependencies to the target
+# directory, preserving paths.
+cat "$tmpdir"/file_paths | sort -u | cpio -pmLdu --quiet "$2"
+
+cleanup
