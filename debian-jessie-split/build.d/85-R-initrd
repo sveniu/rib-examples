@@ -1,1 +1,62 @@
-../../debian-jessie-small/build.d/85-R-initrd
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# The initrd image contains busybox (shell and utilities), a simple init
+# script, two kernel modules (loop and squashfs), and the root squashfs image.
+# The init script will mount the squashfs image with a tmpfs overlay, and then
+# switch execution to the real init inside the squashfs image.
+
+# First, copy the loop and squashfs kernel modules. These modules are needed to
+# mount the root filesystem. After that, additional modules can be loaded from
+# within the newly mounted root.
+#
+# Loop over the modules and look up their full paths. Copy the modules to the
+# target directory while preserving the directory structure with cpio.
+
+#for kmod in loop squashfs
+#do
+#	modinfo -b "$RIB_DIR_ROOTFS" -k "$RIB_KERNEL_VERSION" --filename "$kmod"
+#done | while read kmodpath
+#do
+#	# Strip directory prefix.
+#	printf "%s\n" "${kmodpath#$RIB_DIR_ROOTFS}"
+#done | cpio -pmd "$VTEMP"
+
+mkdir -p "$VTEMP"/lib/modules/"$RIB_KERNEL_VERSION"
+for kmod in loop squashfs
+do
+	path=`modinfo -b "$RIB_DIR_ROOTFS" \
+		-k "$RIB_KERNEL_VERSION" --filename "$kmod"`
+	cp "$path" "$VTEMP"/lib/modules/"$RIB_KERNEL_VERSION"
+done
+
+# Create the module dependency lists. This produces a harmless warning about
+# missing files.
+printf "Resolving module dependencies (ignore warnings) ...\n"
+depmod -b "$VTEMP" "$RIB_KERNEL_VERSION"
+
+# Prepare busybox static binary. This relies on the busybox static binary
+# having already been downloaded and made available in the files directory.
+mkdir "$VTEMP"/bin
+mv "$RIB_DIR_TEMP"/busybox "$VTEMP"/bin/
+chmod +x "$VTEMP"/bin/busybox
+
+# Copy the squashfs image into the initrd build directory.
+mv "$RIB_DIR_TEMP"/rootfs-"$RIB_KERNEL_VERSION".squashfs "$VTEMP"/
+
+# Copy the simple init script from the file repository into the initrd build
+# directory. The kernel tries to execute /init first, then /sbin/init and a few
+# more alteratives, ref init/main.c in the kernel source.
+cp "$RIB_DIR_FILES"/init "$VTEMP"/
+chmod +x "$VTEMP"/init
+
+# Create the initrd cpio archive and compress it with gzip. The gzip
+# compression will not do much with the xz-compressed squashfs image, so
+# there's not much to gain from compression at this stage.
+(
+	cd "$VTEMP"
+	find . | cpio --create -H newc
+) | gzip -1 > "$RIB_DIR_DIST"/initrd-"$RIB_KERNEL_VERSION".cpio.gz
