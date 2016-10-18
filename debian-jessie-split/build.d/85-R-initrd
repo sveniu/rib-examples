@@ -89,6 +89,10 @@ chmod +x "$VTEMP"/bin/busybox
 	cpio -i < "$RIB_DIR_TEMP"/init_exes.cpio
 )
 
+# Copy the udhcpc client script from the file repository into the initrd build
+# directory.
+cp "$RIB_DIR_FILES"/udhcpc.script "$VTEMP"/
+
 # Copy the simple init script from the file repository into the initrd build
 # directory. The kernel tries to execute /init first, then /sbin/init and a few
 # more alteratives, ref init/main.c in the kernel source.

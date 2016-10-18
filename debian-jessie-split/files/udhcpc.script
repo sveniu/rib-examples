@@ -1,0 +1,21 @@
+#!/bin/sh
+
+case "$1" in
+	deconfig)
+		ip link set "$interface" up
+		ip -4 address flush dev "$interface"
+		;;
+	bound)
+		hostname $hostname
+		ip address add "$ip"/"$mask" broadcast + dev "$interface"
+		ip route add default via "$router"
+		for nameserver in ${dns:-8.8.8.8}
+		do
+			printf "nameserver %s\n" "$nameserver" >> \
+				"${DHCP_RESOLV_CONF_PATH:-/etc/resolv.conf}"
+		done
+		;;
+	renew|nak|*)
+		printf "ERROR: udhcp event hook '%s' not implemented.\n" "$1"
+		;;
+esac
