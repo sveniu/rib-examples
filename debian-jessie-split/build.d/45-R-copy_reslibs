@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Copy the bin/reslibs script into the root filesystem, so that it can be run
+# from within a chroot session. This takes advantage of the capabilities of
+# fakechroot to resolve libraries properly.
+cp "$RIB_DIR_BIN"/reslibs "$RIB_DIR_ROOTFS"/

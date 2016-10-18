@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Move the executable and library cpio archives out of the root filesystem.
+mv "$RIB_DIR_ROOTFS"/tmp/init_exes.cpio "$RIB_DIR_TEMP"/
+
+# Remove the 'reslibs' script.
+rm -f "$RIB_DIR_ROOTFS"/reslibs

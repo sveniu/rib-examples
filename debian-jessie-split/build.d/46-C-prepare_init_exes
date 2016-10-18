@@ -1,0 +1,72 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Use the 'reslibs' script (copied into / by the previous build step) to copy
+# executables and all their library dependencies to a temporary directory.
+# Next, the directory is archived to make it easy to move out of the root
+# filesystem, for use in the initrd.
+
+# Set DEBIAN_FRONTEND and TERM, to avoid debconf warnings.
+DEBIAN_FRONTEND="noninteractive"
+export DEBIAN_FRONTEND
+TERM="linux"
+export TERM
+
+# Install packages that provide the executables we need.
+apt-get \
+	--quiet \
+	--assume-yes \
+	-o DPkg::options::="--force-confnew" \
+	install \
+		curl \
+
+# Directory to hold the executables and dependencies.
+mkdir "$VTEMP"/init_exes
+
+# Loop over program names
+for exe in \
+	curl \
+	modprobe \
+	strace \
+; do
+	# Determine executable path.
+	exe_path=`command -v "$exe" 2>/dev/null` || {
+		printf >&2 "ERROR: Executable '%s' not found.\n" "$exe"
+		exit 1
+	}
+
+	# Copy executable and dependencies.
+	printf "INFO: Copying executable '%s' to root.\n" "$exe_path"
+	/reslibs "$exe_path" "$VTEMP"/init_exes/
+done
+
+# Include the libnss_dns library and its dependencies, used by libc to perform
+# DNS lookups via nsswitch when the query source is set to 'dns' in
+# /etc/nsswitch.conf. This is necessary to make DNS work during the init stage,
+# for example if downloading the squashfs root filesystem image.
+find /usr/lib* /lib* -name libnss_dns.so\* | while read lib_path
+do
+	printf "INFO: Copying library '%s' to root.\n" "$lib_path"
+	/reslibs "$lib_path" "$VTEMP"/init_exes/ && break
+done
+
+# Set up symlink to the dynamic linker/loader. This is a bit odd, but appears
+# to be a dependency when using DNS resolution in libc, where libnss_dns.so is
+# loaded via dlopen().
+find "$VTEMP"/lib* "$VTEMP"/usr/lib* -name ld-linux-\* -type f | while read ld_path
+do
+	ln -sf "${ld_path#$VTEMP}" /lib/`basename "$ld_path"`
+done
+
+# Create archive.
+(
+	cd "$VTEMP"/init_exes/
+	find . | cpio --create -H newc > /tmp/init_exes.cpio
+)
+
+# Remove packages again.
+apt-get --quiet --assume-yes --purge remove \
+	curl \

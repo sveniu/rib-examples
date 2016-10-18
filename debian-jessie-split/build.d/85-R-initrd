@@ -44,6 +44,13 @@ mkdir "$VTEMP"/bin
 mv "$RIB_DIR_TEMP"/busybox "$VTEMP"/bin/
 chmod +x "$VTEMP"/bin/busybox
 
+# Copy binaries with dependencies. These were prepared by earlier build
+# scripts, so that everything is readily available within the cpio archive.
+(
+	cd "$VTEMP"
+	cpio -i < "$RIB_DIR_TEMP"/init_exes.cpio
+)
+
 # Copy the simple init script from the file repository into the initrd build
 # directory. The kernel tries to execute /init first, then /sbin/init and a few
 # more alteratives, ref init/main.c in the kernel source.
