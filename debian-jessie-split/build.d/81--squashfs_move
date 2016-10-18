@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Enable 'errexit' and 'nounset'.
+set -e
+set -u
+
+# Move the squashfs image into the dist directory.
+mv "$RIB_DIR_TEMP"/rootfs-"$RIB_KERNEL_VERSION".squashfs "$RIB_DIR_DIST"/

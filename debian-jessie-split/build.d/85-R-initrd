@@ -44,9 +44,6 @@ mkdir "$VTEMP"/bin
 mv "$RIB_DIR_TEMP"/busybox "$VTEMP"/bin/
 chmod +x "$VTEMP"/bin/busybox
 
-# Copy the squashfs image into the initrd build directory.
-mv "$RIB_DIR_TEMP"/rootfs-"$RIB_KERNEL_VERSION".squashfs "$VTEMP"/
-
 # Copy the simple init script from the file repository into the initrd build
 # directory. The kernel tries to execute /init first, then /sbin/init and a few
 # more alteratives, ref init/main.c in the kernel source.
