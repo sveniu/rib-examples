@@ -52,6 +52,21 @@ if [ "${debug_level:-0}" -gt 0 ] 2>/dev/null; then
 	/bin/sh
 fi
 
+# Scan for network interfaces sorted by bus address, and load the appropriate
+# kernel modules. This relies on the full modprobe program provided by kmod
+# (executed with full path); the one in busybox doesn't support reverse
+# modalias lookups.
+find /sys/devices/pci* -name class | sort | while read cpath
+do
+	grep -q "^0x02" "$cpath" || continue
+	test -f "${cpath%/class}"/modalias || continue
+	modalias=`cat "${cpath%/class}"/modalias`
+	kmod=`/sbin/modprobe -R "$modalias" | head -n1`
+	test -n "${kmod:-}" || continue
+	printf "Attempting to load module '%s'.\n" "$kmod"
+	modprobe "$kmod"
+done
+
 # Load loop and squashfs kernel modules.
 modprobe loop # squashfs mount dependency
 modprobe squashfs
