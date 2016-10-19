@@ -102,6 +102,16 @@ if [ -f "$RIB_DIR_FILES"/ca_certs ]; then
 	cp "$RIB_DIR_FILES"/ca_certs "$VTEMP"/etc/ssl/
 fi
 
+# Copy TLS client certificate (including private key) from the file repository
+# into the initrd build directory.
+if [ -f "$RIB_DIR_FILES"/client_cert ]; then
+	printf "INFO: Including client cert+key from file '%s'.\n" \
+		"$RIB_DIR_FILES"/client_cert
+	mkdir -p "$VTEMP"/etc/ssl
+	cp "$RIB_DIR_FILES"/client_cert "$VTEMP"/etc/ssl/
+	chmod 400 "$VTEMP"/etc/ssl/client_cert
+fi
+
 # Copy the init script from the file repository into the initrd build
 # directory. The kernel tries to execute /init first, then /sbin/init and a few
 # more alteratives, ref init/main.c in the kernel source.

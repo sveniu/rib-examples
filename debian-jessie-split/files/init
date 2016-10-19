@@ -91,6 +91,9 @@ if [ -n "$squashfs_url" ]; then
 	if [ -f /etc/ssl/ca_certs ]; then
 		CURL_OPTS="$CURL_OPTS --cacert /etc/ssl/ca_certs"
 	fi
+	if [ -f /etc/ssl/client_cert ]; then
+		CURL_OPTS="$CURL_OPTS --cert /etc/ssl/client_cert"
+	fi
 	printf "Fetching squashfs image from URL: %s\n" "$squashfs_url"
 	curl -o /rootfs.squashfs $CURL_OPTS "$squashfs_url" || {
 		printf "curl trace output:\n"

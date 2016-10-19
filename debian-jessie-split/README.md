@@ -38,6 +38,10 @@ are involved), and the file will be included in the initrd image as
 file does not exist, curl will still use its built-in defaults to attempt
 certificate verification of TLS servers, and fail.
 
+* TLS client certificate. Put the PEM-formatted certificate and key in
+`files/client_cert`, and it will be included in the initrd image as
+`/etc/ssl/client_cert` and used by curl when fetching the squashfs image.
+
 Dependencies: `fakechroot`, `fakeroot`, `debootstrap`, `mksquashfs` (in package
 `squashfs-tools` in Debian/Ubuntu).
 
