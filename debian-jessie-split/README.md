@@ -51,8 +51,9 @@ various environment variables like `RIB_DEB_SUITE`, `RIB_DEB_MIRROR` and
 
 Build with `rib build -v`; test with qemu:
 ```sh
-qemu-system-x86_64 -nographic -m 512M -append "console=ttyS0" \
-  -kernel vmlinuz-3.16.0-4-amd64 -initrd initrd-3.16.0-4-amd64.cpio.gz
+qemu-system-x86_64 -nographic -m 512M \
+  -append "console=ttyS0 rib.squashfs_url=http://.../rootfs.squashfs" \
+  -kernel vmlinuz-* -initrd initrd-*.cpio.xz
 ```
 
 [1]: https://github.com/sveniu/rib/
