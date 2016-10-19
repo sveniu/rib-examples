@@ -20,6 +20,9 @@ scripts are symlinks to the simple example above.
 separate from the initrd. The init script supports networking and fetching of
 the squashfs image.
 
+* `debian-jessie-zram`: Like the split profile, but can use zram for the
+ramdisk overlay.
+
 [1]: https://github.com/sveniu/rib/
 [2]: https://github.com/dex4er/fakechroot/
 
