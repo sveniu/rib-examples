@@ -124,9 +124,32 @@ mount -t squashfs "$squashfs_path" /newroot_ro
 mv /lib /lib.old
 ln -s /newroot_ro/lib /lib
 
-# Mount read-write tmpfs ramdisk in /newroot_rw.
+# Mount read-write ramdisk in /newroot_rw.
 mkdir /newroot_rw
-mount -t tmpfs -o size=100%,mode=0755 tmpfs /newroot_rw
+ramdisk_type=`get_kparam rib.rdtype` || true
+case "${ramdisk_type:-tmpfs}" in
+	tmpfs)
+		mount -t tmpfs -o size=100%,mode=0755 tmpfs /newroot_rw
+		;;
+	zram)
+		modprobe zram num_devices=4
+		while read key value unit
+		do
+			if [ "${key%%:*}" = "MemTotal" ]; then
+				zram_disksize="$((value * 2))K"
+				break
+			fi
+		done < /proc/meminfo
+
+		echo "${zram_disksize:-1G}" > /sys/block/zram0/disksize
+		mke2fs -t ext4 -O ^has_journal /dev/zram0
+		mount -t ext4 -o discard,barrier=0 /dev/zram0 /newroot_rw
+		;;
+	*)
+		printf >&2 "Unknown ramdisk type: %s\n" "$ramdisk_type"
+		false
+		;;
+esac
 
 # Determine overlay type. Read the rib.overlay= parameter if available, and
 # fall back to checking the kernel version to determine aufs or overlayfs
