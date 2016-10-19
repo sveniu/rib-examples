@@ -29,6 +29,7 @@ mkdir "$VTEMP"/init_exes
 # Loop over program names
 for exe in \
 	curl \
+	mke2fs \
 	modprobe \
 	strace \
 ; do
