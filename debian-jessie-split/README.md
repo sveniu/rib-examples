@@ -31,6 +31,13 @@ tools like curl.
 * The squashfs image URL is specified via the `rib.squashfs_url` kernel
 parameter.
 
+* TLS server certificate verification. Put one ore more PEM certificates in the
+`files/ca_certs` file (include the entire chain if intermediate certificates
+are involved), and the file will be included in the initrd image as
+`/etc/ssl/ca_certs` and used by curl when fetching the squashfs image. If the
+file does not exist, curl will still use its built-in defaults to attempt
+certificate verification of TLS servers, and fail.
+
 Dependencies: `fakechroot`, `fakeroot`, `debootstrap`, `mksquashfs` (in package
 `squashfs-tools` in Debian/Ubuntu).
 

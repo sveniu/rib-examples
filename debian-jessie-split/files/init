@@ -68,7 +68,7 @@ do
 done
 
 # Iterate over network interfaces and attempt DHCP configuration.
-mkdir /etc # to hold resolv.conf, ref udhcpc.script.
+mkdir -p /etc # to hold resolv.conf, ref udhcpc.script.
 for f in /sys/class/net/*
 do
 	iface=`basename "$f"`
@@ -87,8 +87,17 @@ done
 # Fetch squashfs image.
 squashfs_url=`get_kparam rib.squashfs_url` || true
 if [ -n "$squashfs_url" ]; then
+	CURL_OPTS="--fail --trace-ascii /curl-debug.txt --trace-time"
+	if [ -f /etc/ssl/ca_certs ]; then
+		CURL_OPTS="$CURL_OPTS --cacert /etc/ssl/ca_certs"
+	fi
 	printf "Fetching squashfs image from URL: %s\n" "$squashfs_url"
-	curl -o /rootfs.squashfs "$squashfs_url"
+	curl -o /rootfs.squashfs $CURL_OPTS "$squashfs_url" || {
+		printf "curl trace output:\n"
+		cat /curl-debug.txt
+		printf "\n\nDropping to shell.\n\n"
+		/bin/sh
+	}
 fi
 
 # Load loop and squashfs kernel modules.
